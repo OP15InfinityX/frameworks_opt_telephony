@@ -988,6 +988,27 @@ public class GsmCdmaPhoneTest extends TelephonyTest {
 
     @Test
     @SmallTest
+    public void testGetUserHandleWithInvalidSubIdReturnsNull() {
+        doReturn(SubscriptionManager.INVALID_SUBSCRIPTION_ID).when(mSubscriptionManagerService)
+                .getSubId(anyInt());
+
+        assertNull(mPhoneUT.getUserHandle());
+        verify(mSubscriptionManager, never()).getSubscriptionUserHandle(anyInt());
+    }
+
+    @Test
+    @SmallTest
+    public void testGetUserHandleReturnsSubscriptionUserHandle() {
+        final int subId = 1;
+        final UserHandle userHandle = UserHandle.of(10);
+        doReturn(subId).when(mSubscriptionManagerService).getSubId(anyInt());
+        when(mSubscriptionManager.getSubscriptionUserHandle(subId)).thenReturn(userHandle);
+
+        assertEquals(userHandle, mPhoneUT.getUserHandle());
+    }
+
+    @Test
+    @SmallTest
     public void testGetIccCardUnknownAndAbsent() {
         // If UiccSlot.isStateUnknown is true, we should return a placeholder IccCard with the state
         // set to UNKNOWN
@@ -1433,6 +1454,31 @@ public class GsmCdmaPhoneTest extends TelephonyTest {
 
             verify(mMockCi, never()).setN1ModeEnabled(anyBoolean(), any());
         }
+    }
+
+    @Test
+    public void testN1ModeQueryNullResponseDoesNotInferState() {
+        mPhoneUT.mCi = mMockCi;
+        mPhoneUT.handleMessage(mPhoneUT.obtainMessage(Phone.EVENT_GET_N1_MODE_ENABLED_DONE));
+
+        mPhoneUT.setN1ModeEnabled(false, null);
+        processAllMessages();
+
+        verify(mMockCi).isN1ModeEnabled(any());
+        verify(mMockCi, never()).setN1ModeEnabled(anyBoolean(), any());
+    }
+
+    @Test
+    public void testN1ModeSetNullResponseClearsCachedState() {
+        testNrCapabilityChanged_firstRequest_needsChange();
+        mPhoneUT.handleMessage(mPhoneUT.obtainMessage(Phone.EVENT_SET_N1_MODE_ENABLED_DONE));
+
+        mPhoneUT.setN1ModeEnabled(false, null);
+        processAllMessages();
+
+        verify(mMockCi, times(2)).isN1ModeEnabled(any());
+        verify(mMockCi, times(1)).setN1ModeEnabled(eq(true), any());
+        verify(mMockCi, never()).setN1ModeEnabled(eq(false), any());
     }
 
     @Test
